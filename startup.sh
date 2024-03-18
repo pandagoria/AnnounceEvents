@@ -6,4 +6,4 @@ source "bots/bin/activate"
 echo "Виртуальная среда активирована"
 pip3 install -r requirements.txt
 echo "Установлены зависимости"
-bash announce.sh bot > log.txt
+bash announce.sh
