@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python3.12 -m venv bots
+python3.11 -m venv bots
 echo "Виртуальная среда создана"
 source "bots/bin/activate"
 echo "Виртуальная среда активирована"

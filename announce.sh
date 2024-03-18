@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# source "source bots/bin/activate"
+source bots/bin/activate
 
 #bot startup
 if [ $1 == "bot" ]
 then
-    python DiscordBot.py
+    python3 DiscordBot.py
 fi
 
 if [ $1 == "script" ]
