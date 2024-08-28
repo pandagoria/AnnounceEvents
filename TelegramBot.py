@@ -1,7 +1,5 @@
 import requests
-import json
-from config.tg_config import TG_CONFIG
-from typing import Union
+from config import TG_CONFIG
 
 
 class TGBot:
