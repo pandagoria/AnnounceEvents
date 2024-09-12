@@ -3,41 +3,60 @@ from discord.ext import commands
 import logging
 from TelegramBot import TGBot
 from config import DISCORD_CONFIG
+import requests
+import asyncio
+
+# logging.basicConfig(level=logging.INFO)
 
 
 class Cmds(commands.Cog, name="cmds"):
     def __init__(self, bot) -> None:
         self.bot = bot
 
-    async def publish(self, chat_name, msg: str):
+    async def publish(self, chat_name, ctx, msg: str):
+        res = {"content": msg}
+        if len(ctx.message.attachments) > 0:
+            attachment = ctx.message.attachments[0]
+            if (
+                attachment.filename.endswith(".jpg")
+                or attachment.filename.endswith(".jpeg")
+                or attachment.filename.endswith(".png")
+                or attachment.filename.endswith(".webp")
+                or attachment.filename.endswith(".gif")
+            ):
+                img_data = requests.get(attachment.url).content
+                with open("image_name.jpg", "wb") as handler:
+                    handler.write(img_data)
+                    attch = discord.File(fp="image_name.jpg", filename="image_name.jpg")
+                    res["file"] = attch
         # discord
         channel_ids = self.bot.config["channel_ids"]
         if len(msg) > 0:
             channel = self.bot.get_channel(channel_ids[chat_name])
-            await channel.send(msg)
+            await channel.send(**res)
         # tg
-        self.bot.telegram_bot.sendMessage(msg)
+        self.bot.telegram_bot.sendMessage(msg, attachment.url)
 
     @commands.hybrid_command(name="stream", with_app_command=True)
     @commands.is_owner()
     async def stream(self, ctx, msg):
         if isinstance(ctx.channel, discord.channel.DMChannel):
             logging.info("Запись и публикация анонса")
-            await self.publish("announcement", msg)
+            await self.publish("announcement", ctx, msg)
 
     @commands.hybrid_command(name="yt", with_app_command=True)
     @commands.is_owner()
     async def yt(self, ctx, msg):
         if isinstance(ctx.channel, discord.channel.DMChannel):
             logging.info("Запись и публикация анонса видео на YouTube")
-            await self.publish("youtube", msg)
+            await self.publish("youtube", ctx, msg)
 
     @commands.hybrid_command(name="test", with_app_command=True)
     @commands.is_owner()
     async def test(self, ctx, msg):
         if isinstance(ctx.channel, discord.channel.DMChannel):
             logging.info("Выолняется тестовая команда")
-            await self.publish("test", msg)
+            await self.publish("test", ctx, msg)
 
     @commands.hybrid_command(name="close", with_app_command=True)
     @commands.is_owner()
@@ -69,6 +88,11 @@ class DiscordBot(commands.Bot):
         logging.info("Bot closed")
 
 
+async def hui(ds):
+    await ds.add_cog(Cmds(ds))
+    await ds.start(token=config["token"], reconnect=True)
+
+
 if __name__ == "__main__":
     config = DISCORD_CONFIG.copy()
     telegram_bot = TGBot()
@@ -78,4 +102,4 @@ if __name__ == "__main__":
         intents=discord.Intents().all(),
         telegram_bot=telegram_bot,
     )
-    ds.run(token=config["token"])
+    asyncio.run(hui(ds))
