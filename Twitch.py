@@ -15,15 +15,15 @@ class TwitchClient:
         self.config = Config("config/twitch_config.json")
         self.auth_session = None
         self.discord_bot = discord_bot
-        self.loop = asyncio.get_event_loop()
 
     def authorize(self) -> None:
-        self.auth_session = OAuth2Session(
-            self.config.client_id,
-            redirect_uri=self.config.redirect_uri,
-            scope=self.config.scope,
-            token=self.config.token,
-        )
+        if self.auth_session is None:
+            self.auth_session = OAuth2Session(
+                self.config.client_id,
+                redirect_uri=self.config.redirect_uri,
+                scope=self.config.scope,
+                token=self.config.token,
+            )
 
         if not self.config.token:
             # Процесс первой авторизации
@@ -46,11 +46,10 @@ class TwitchClient:
             logging.info("Token info saved")
         else:
             try:
-                # Обновление токена с использованием рефреш токена
                 self.config.token = self.auth_session.refresh_token(
                     self.config.oauth_url + "/token",
                     verify=False,
-                    refresh_token=self.config.token["refresh_token"],  # unneseccary
+                    refresh_token=self.config.token["refresh_token"],
                     client_id=self.config.client_id,
                     client_secret=self.config.client_secret,
                 )
@@ -84,13 +83,23 @@ class TwitchClient:
     def get_stream_info(self):
         if self.auth_session is None:
             self.authorize()
-        r = self.auth_session.get(
-            f"{self.config.api_url}/helix/channels?broadcaster_id={self.config.user_id}",
-            headers={
-                "Authorization": "Bearer " + self.config.token["access_token"],
-                "Client-Id": self.config.client_id,
-            },
-        )
+        try:
+            r = self.auth_session.get(
+                f"{self.config.api_url}/helix/channels?broadcaster_id={self.config.user_id}",
+                headers={
+                    "Authorization": "Bearer " + self.config.token["access_token"],
+                    "Client-Id": self.config.client_id,
+                },
+            )
+        except TokenExpiredError as e:
+            self.authorize()
+            r = self.auth_session.get(
+                f"{self.config.api_url}/helix/channels?broadcaster_id={self.config.user_id}",
+                headers={
+                    "Authorization": "Bearer " + self.config.token["access_token"],
+                    "Client-Id": self.config.client_id,
+                },
+            )
         stream_data = r.json()["data"][0]
         logging.info(stream_data)
         return stream_data["game_name"], stream_data["title"]
@@ -102,8 +111,7 @@ class TwitchClient:
             "condition": {"broadcaster_user_id": self.config.user_id},
             "transport": {"method": "websocket", "session_id": session_id},
         }
-        if self.auth_session is None:
-            self.authorize()
+        self.authorize()
         r = self.auth_session.post(
             self.config.api_url + "/helix/eventsub/subscriptions",
             headers={
@@ -116,28 +124,22 @@ class TwitchClient:
         return r.json()
 
     async def websocket_session(self):
-        async with ClientSession() as session:
-            reconnect = False
-            while True:
-                try:
-                    if reconnect is True:
-                        await self.run_ws(session, reconnect=True)
-                    else:
-                        await self.run_ws(session)
-                except ClientError as e:
-                    logging.warning(f"Reconnecting WS: {e}")
-                    reconnect = True
-                except ServerDisconnectedError as e:
-                    logging.error(f"shiiit: {e}")
-                    raise
+        session = ClientSession()
+        while True:
+            try:
+                await self.run_ws(session)
+            except ServerDisconnectedError as e:
+                logging.error(f"shiiit: {e}")
+                session.close()
+                session = ClientSession()
 
-    async def run_ws(self, session, reconnect=False) -> None:
+    async def run_ws(self, session) -> None:
         async with session.ws_connect(self.config.eventsub["websocket_url"]) as ws:
             res = await ws.receive()
+            logging.info(res)
             session_id = json.loads(res.data)["payload"]["session"]["id"]
             logging.info("Connected")
-            if not reconnect:
-                private_channels_tokens = self.events_sub(session_id)
+            private_channels_tokens = self.events_sub(session_id)
             async for msg in ws:
                 data = json.loads(msg.data)
                 metadata = data["metadata"]
@@ -157,15 +159,14 @@ class TwitchClient:
                             f"""{title}: {game_name.upper()}
                             {my_links}""",
                         )
-                    elif metadata["message_type"] == "session_reconnect":
-                        logging.info("Session reconnect message received.")
-                        self.config.eventsub["websocket_url"] = data["payload"][
-                            "reconnect_url"
-                        ]
-                        raise ClientError(
-                            "I dunno which exception would fit but it's for reconnection"
-                        )
-                elif msg.type == web.WSMsgType.ERROR:
+                    elif (
+                        msg.type == web.WSMsgType.ERROR
+                        or msg.type == web.WSMsgType.CLOSE
+                    ):
+                        logging.info("inside")
+                        raise ServerDisconnectedError()
+                elif msg.type == web.WSMsgType.ERROR or msg.type == web.WSMsgType.CLOSE:
+                    logging.info("out")
                     raise ServerDisconnectedError()
 
             logging.info("Disconnected")

@@ -13,7 +13,9 @@ import logging
 # app = web.Application()
 
 # app.add_subapp("/twitch", oauth2_app()
-logging.basicConfig(level=logging.INFO, filename="NEW_LOG.txt")
+logging.basicConfig(
+    level=logging.INFO, filename="log.txt", format="%(asctime)s %(message)s"
+)
 
 
 async def main() -> None:
@@ -33,8 +35,6 @@ async def main() -> None:
         ds.start(token=ds_conf["token"], reconnect=True), twitch.websocket_session()
     )
 
-
-# session = asyncio.run([ds.start()])
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -29,13 +29,14 @@ class Cmds(commands.Cog, name="cmds"):
                     handler.write(img_data)
                     attch = discord.File(fp="image_name.jpg", filename="image_name.jpg")
                     res["file"] = attch
+                self.bot.telegram_bot.sendMessage(msg, attachment.url)
+        else:
+            self.bot.telegram_bot.sendMessage(msg)
         # discord
         channel_ids = self.bot.config["channel_ids"]
         if len(msg) > 0:
             channel = self.bot.get_channel(channel_ids[chat_name])
             await channel.send(**res)
-        # tg
-        self.bot.telegram_bot.sendMessage(msg, attachment.url)
 
     @commands.hybrid_command(name="stream", with_app_command=True)
     @commands.is_owner()
@@ -43,13 +44,6 @@ class Cmds(commands.Cog, name="cmds"):
         if isinstance(ctx.channel, discord.channel.DMChannel):
             logging.info("Запись и публикация анонса")
             await self.publish("announcement", ctx, msg)
-
-    @commands.hybrid_command(name="yt", with_app_command=True)
-    @commands.is_owner()
-    async def yt(self, ctx, msg):
-        if isinstance(ctx.channel, discord.channel.DMChannel):
-            logging.info("Запись и публикация анонса видео на YouTube")
-            await self.publish("youtube", ctx, msg)
 
     @commands.hybrid_command(name="test", with_app_command=True)
     @commands.is_owner()

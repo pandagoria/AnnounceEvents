@@ -7,22 +7,23 @@ class TGBot:
         self.conf = TG_CONFIG
 
     def sendMessage(self, msg: str, file_url=None):
-        method = "sendMessage"
         if len(msg) > 0:
-            if file_url:
-                method = "sendPhoto"
-                r = requests.post(
+            if method == "sendPhoto":
+                r_group = requests.post(
                     url=self.conf["client"] + method,
                     data={
-                        "chat_id": self.conf["channel_id"],
+                        "chat_id": self.conf["panda_group"]["channel_id"],
                         "caption": msg,
                         "photo": file_url,
                     },
                 )
             else:
-                r = requests.post(
+                r_group = requests.post(
                     self.conf["client"] + method,
-                    data={"chat_id": self.conf["channel_id"], "text": msg},
+                    data={
+                        "chat_id": self.conf["panda_group"]["channel_id"],
+                        "text": msg,
+                    },
                 )
-            if r.status_code != 200:
+            if r_group.status_code != 200:
                 raise Exception(r.text)
